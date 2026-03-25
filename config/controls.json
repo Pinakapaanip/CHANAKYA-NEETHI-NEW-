@@ -1,0 +1,11 @@
+{
+  "move_left": "a",
+  "move_right": "d",
+  "move_up": "w",
+  "move_down": "s",
+  "attack": "j",
+  "interact": "e",
+  "switch_sword": "1",
+  "switch_bow": "2",
+  "dialogue_next": "space"
+}
