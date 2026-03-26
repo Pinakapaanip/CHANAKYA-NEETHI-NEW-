@@ -109,9 +109,10 @@ class Level2BharukacchaScene(BaseScene):
             self.state_manager.set("minimap_pass_unlocked", False)
             self.state_manager.set("spy_met_in_minimap", False)
 
-        # Spawn soldiers at level start (before bow acquisition).
-        if not self.first_wave_spawned:
+        # Keep first wave locked until bow is collected and Chanakya training is done.
+        if self._can_spawn_first_wave() and not self.first_wave_spawned:
             self.spawn_first_wave()
+        elif not self.first_wave_spawned:
             self.objective_manager.set_objective(OBJECTIVES_LEVEL2["meet_chanakya"])
 
     def _discover_video_labels(self):
@@ -214,6 +215,11 @@ class Level2BharukacchaScene(BaseScene):
         self.first_wave_spawned = True
         self.objective_manager.set_objective(OBJECTIVES_LEVEL2["defeat_soldiers"])
 
+    def _can_spawn_first_wave(self):
+        return self.state_manager.get("has_bow", False) and self.state_manager.get(
+            "bow_training_cutscene_done", False
+        )
+
     def register_enemy_death(self, enemy):
         enemy_id = id(enemy)
         if enemy_id in self.enemy_death_registry:
@@ -297,6 +303,9 @@ class Level2BharukacchaScene(BaseScene):
         if not self.cutscene_manager.is_active():
             self.handle_player_attack()
             self.handle_interactions()
+
+        if self._can_spawn_first_wave() and not self.first_wave_spawned:
+            self.spawn_first_wave()
 
         # Move to minimap scene from middle road after bow training.
         if (

@@ -1,9 +1,9 @@
 {
-  "player_health": 8560,
-  "coins_collected": 123,
+  "player_health": 8352,
+  "coins_collected": 41,
   "has_sword": true,
   "has_bow": true,
-  "current_weapon": "bow",
+  "current_weapon": "sword",
   "combat_active": false,
   "enemies_defeated_count": 4,
   "map_piece_collected": true,
