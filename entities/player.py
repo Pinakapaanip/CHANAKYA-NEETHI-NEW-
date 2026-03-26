@@ -89,11 +89,21 @@ class Player(BaseEntity):
         self.bow_attack_sprites = [frame for frame in self.bow_attack_sprites if frame]
         if self.bow_attack_sprites:
             self.bow_attack_sprites[0] = self._remove_near_bg(self.bow_attack_sprites[0], tolerance=50)
+        # Sword attack: prefer the new player attack PNG sequence, fall back to older effect sprites.
         self.sword_attack_sprites = [
-            load_first_image(["effects/splash.jpeg"], size=(self.rect.width, self.rect.height)),
-            load_first_image(["effects/splash1.jpeg"], size=(self.rect.width, self.rect.height)),
+            load_first_image(["player/player attack (1).png"], size=(self.rect.width, self.rect.height)),
+            load_first_image(["player/player attack (2).png"], size=(self.rect.width, self.rect.height)),
+            load_first_image(["player/player attack (3).png"], size=(self.rect.width, self.rect.height)),
+            load_first_image(["player/player attack (4).png"], size=(self.rect.width, self.rect.height)),
         ]
         self.sword_attack_sprites = [frame for frame in self.sword_attack_sprites if frame]
+        if not self.sword_attack_sprites:
+            self.sword_attack_sprites = [
+                load_first_image(["effects/splash.jpeg"], size=(self.rect.width, self.rect.height)),
+                load_first_image(["effects/splash1.jpeg"], size=(self.rect.width, self.rect.height)),
+            ]
+            self.sword_attack_sprites = [frame for frame in self.sword_attack_sprites if frame]
+
         self.sword_attack_sprites = [self._remove_near_bg(frame, tolerance=50) for frame in self.sword_attack_sprites]
         self.attack_sprites = self._frames_from_bank(["attack_01", "attack_02", "attack_03", "attack"])
         self.attack_frame_index = 0

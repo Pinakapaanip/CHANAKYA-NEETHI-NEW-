@@ -44,15 +44,6 @@ class HUD:
         
         surface.blit(weapon_text, (30, 92))
 
-        objective_panel = pygame.Rect(16, surface.get_height() - 126, 470, 98)
-        pygame.draw.rect(surface, UI_BG_ALT, objective_panel, border_radius=10)
-        pygame.draw.rect(surface, UI_BORDER, objective_panel, 2, border_radius=10)
-
-        obj_title = self.small_font.render("Objective", True, WHITE)
-        obj_line = self.small_font.render(objective_text, True, WHITE)
-        surface.blit(obj_title, (objective_panel.x + 14, objective_panel.y + 12))
-        surface.blit(obj_line, (objective_panel.x + 14, objective_panel.y + 44))
-
         if interaction_hint:
             hint_surf = self.small_font.render(interaction_hint, True, WHITE)
             hint_rect = hint_surf.get_rect(center=(surface.get_width() // 2, surface.get_height() - 20))

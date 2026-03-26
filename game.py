@@ -22,8 +22,7 @@ class Game:
         self.running = True
 
         self.state_manager = StateManager()
-        # Level 3 standalone run: load whatever is in save (if present) but do not depend on Level 1/2 scenes.
-        self.state_manager.load_for_level2()
+        # Always start a fresh run (do not load save state).
 
         self.scene_manager = SceneManager()
         self.scene_factories = {
@@ -107,5 +106,5 @@ class Game:
             self.scene_manager.draw(self.screen)
             pygame.display.flip()
 
-        self.state_manager.save_progress()
+        # Fresh-run mode: do not persist state between runs.
         pygame.quit()
