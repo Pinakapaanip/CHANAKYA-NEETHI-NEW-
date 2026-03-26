@@ -8,8 +8,10 @@ except Exception:
 
 from core.scene_manager import SceneManager
 from core.state_manager import StateManager
-from scenes.level2_bharukaccha_scene import Level2BharukacchaScene
-from scenes.level2_minimap_scene import Level2MinimapScene
+from scenes.level1_village_scene import Level1VillageScene
+from scenes.level1_scene2_minimap import Level1Scene2Minimap
+from scenes.game_over_scene import GameOverScene
+from scenes.level_complete_scene import LevelCompleteScene
 from settings import FPS, SCREEN_HEIGHT, SCREEN_WIDTH, TITLE
 
 
@@ -22,19 +24,37 @@ class Game:
         self.running = True
 
         self.state_manager = StateManager()
-        self.state_manager.load_for_level2()
+        self.state_manager.reset_new_game(persist=True)
 
         self.scene_manager = SceneManager()
+        self.death_delay_seconds = 2.0
+        self._death_timer = 0.0
         self.scene_factories = {
-            "level2_bharukaccha": lambda: Level2BharukacchaScene(self, self.state_manager),
-            "level2_minimap": lambda: Level2MinimapScene(self, self.state_manager),
+            "level1_village": lambda: Level1VillageScene(self, self.state_manager),
+            "level1_scene2": lambda: Level1Scene2Minimap(self, self.state_manager),
+            "game_over": lambda: GameOverScene(self),
+            "level_complete": lambda: LevelCompleteScene(self),
         }
-        self.load_scene("level2_bharukaccha")
+        self.load_scene("level1_village")
         self.intro_played = False
 
     def load_scene(self, scene_key):
         scene_factory = self.scene_factories[scene_key]
         self.scene_manager.set_scene(scene_factory())
+
+    def restart(self):
+        self.state_manager = StateManager()
+        self.state_manager.reset_new_game(persist=True)
+
+        self._death_timer = 0.0
+
+        self.scene_factories = {
+            "level1_village": lambda: Level1VillageScene(self, self.state_manager),
+            "level1_scene2": lambda: Level1Scene2Minimap(self, self.state_manager),
+            "game_over": lambda: GameOverScene(self),
+            "level_complete": lambda: LevelCompleteScene(self),
+        }
+        self.load_scene("level1_village")
 
     def register_scene(self, scene_key, scene_factory):
         self.scene_factories[scene_key] = scene_factory
@@ -102,7 +122,22 @@ class Game:
                 else:
                     self.scene_manager.handle_event(event)
 
-            self.scene_manager.update(dt)
+            if self.state_manager.get("player_health", 100) <= 0:
+                if not isinstance(self.scene_manager.current_scene, GameOverScene):
+                    self._death_timer += dt
+
+                    current_scene = self.scene_manager.current_scene
+                    player = getattr(current_scene, "player", None)
+                    if player is not None:
+                        player.health = 0
+                        player.alive = False
+                        player.control_enabled = False
+
+                    if self._death_timer >= self.death_delay_seconds:
+                        self.load_scene("game_over")
+            else:
+                self._death_timer = 0.0
+                self.scene_manager.update(dt)
             self.scene_manager.draw(self.screen)
             pygame.display.flip()
 

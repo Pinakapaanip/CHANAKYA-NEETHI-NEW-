@@ -3,7 +3,7 @@ from pathlib import Path
 import pygame
 
 
-ASSETS_ROOT = Path(__file__).resolve().parents[1] / "assets"
+ASSETS_ROOT = Path(__file__).resolve().parents[1] / "ASSETS"
 
 
 def asset_path(*parts):

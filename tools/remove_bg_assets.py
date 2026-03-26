@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PIL import Image
 
-ROOT = Path(__file__).resolve().parents[1] / "assets"
+ROOT = Path(__file__).resolve().parents[1] / "ASSETS"
 FOLDERS = ["player", "enemies", "npcs", "bosses"]
 EXTENSIONS = {".png", ".jpg", ".jpeg"}
 DEFAULT_TOLERANCE = 42
@@ -31,7 +31,28 @@ def remove_background(img, tolerance):
         border.append(px[0, y][:3])
         border.append(px[w - 1, y][:3])
 
-    bg = Counter(border).most_common(1)[0][0]
+    # Common case: a single solid background color.
+    # Some sprites are exported with a checkerboard background baked in
+    # (typically two alternating grays). Handle both.
+    border_counts = Counter(border)
+    most_common = border_counts.most_common(2)
+    bg1 = most_common[0][0]
+    bg2 = most_common[1][0] if len(most_common) > 1 else bg1
+
+    # If the border is mostly just these two colors, we likely have a checkerboard
+    # 'transparency preview' baked into the sprite. In that case, do a global
+    # clear pass (not just flood-fill), otherwise keep the safer flood-fill.
+    total_border = sum(border_counts.values())
+    dominant_ratio = (border_counts[bg1] + border_counts[bg2]) / max(1, total_border)
+    checkerboard_mode = dominant_ratio >= 0.85
+
+    if checkerboard_mode:
+        for y in range(h):
+            for x in range(w):
+                c = px[x, y][:3]
+                if color_close(c, bg1, tolerance) or color_close(c, bg2, tolerance):
+                    px[x, y] = (px[x, y][0], px[x, y][1], px[x, y][2], 0)
+        return rgba
 
     visited = [[False] * h for _ in range(w)]
     q = deque()
@@ -50,7 +71,7 @@ def remove_background(img, tolerance):
 
     while q:
         x, y = q.popleft()
-        if color_close(px[x, y][:3], bg, tolerance):
+        if color_close(px[x, y][:3], bg1, tolerance) or color_close(px[x, y][:3], bg2, tolerance):
             px[x, y] = (px[x, y][0], px[x, y][1], px[x, y][2], 0)
             push(x + 1, y)
             push(x - 1, y)

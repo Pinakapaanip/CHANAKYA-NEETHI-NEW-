@@ -22,11 +22,7 @@ class HUD:
             self.coin_icon_angle = 0
         
         coin_text = self.font.render(f"Coins: {state['coins_collected']}", True, YELLOW)
-        weapon_text = self.small_font.render(
-            f"Weapon: {state['current_weapon'].title()}  (1 Sword | 2 Bow)",
-            True,
-            WHITE,
-        )
+        weapon_text = self.small_font.render("Weapon: Sword  (LMB Attack)", True, WHITE)
 
         surface.blit(hp_text, (30, 26))
         surface.blit(coin_text, (30, 58))

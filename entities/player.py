@@ -18,8 +18,8 @@ class Player(BaseEntity):
     def __init__(self, x, y, state_manager):
         super().__init__(x, y, 50, 70)
         self.state_manager = state_manager
-        self.max_health = 10000
-        self.health = state_manager.get("player_health", 10000)
+        self.max_health = 100
+        self.health = state_manager.get("player_health", 100)
         self.speed = 240
         self.facing = 1
         self.control_enabled = True
@@ -49,39 +49,48 @@ class Player(BaseEntity):
         self.idle_frames = self._frames_from_bank(["idle", "idle2"])
         if not self.idle_frames:
             self.idle_frames = [
-                load_first_image(["player/idle.jpeg"], size=(self.rect.width, self.rect.height)),
-                load_first_image(["player/idle2.jpeg"], size=(self.rect.width, self.rect.height)),
+                load_first_image(["player/idle.png", "player/idle.jpeg", "player/idle.jpg"], size=(self.rect.width, self.rect.height)),
+                load_first_image(["player/idle2.png", "player/idle2.jpeg", "player/idle2.jpg"], size=(self.rect.width, self.rect.height)),
             ]
             self.idle_frames = [frame for frame in self.idle_frames if frame]
 
         self.run_frames = self._frames_from_bank(["idle_run", "idle_run1", "idle_run2"])
         if not self.run_frames:
             self.run_frames = [
-                load_first_image(["player/idle_run.jpeg"], size=(self.rect.width, self.rect.height)),
-                load_first_image(["player/idle_run1.jpeg"], size=(self.rect.width, self.rect.height)),
-                load_first_image(["player/idle_run2.jpeg"], size=(self.rect.width, self.rect.height)),
+                load_first_image(["player/idle_run.png", "player/idle_run.jpeg", "player/idle_run.jpg"], size=(self.rect.width, self.rect.height)),
+                load_first_image(["player/idle_run1.png", "player/idle_run1.jpeg", "player/idle_run1.jpg"], size=(self.rect.width, self.rect.height)),
+                load_first_image(["player/idle_run2.png", "player/idle_run2.jpeg", "player/idle_run2.jpg"], size=(self.rect.width, self.rect.height)),
             ]
             self.run_frames = [frame for frame in self.run_frames if frame]
 
         # Bow idle: use only bow.png
         self.bow_sprite = load_first_image(["player/bow.png"], size=(self.rect.width, self.rect.height))
 
-        # Bow move: cycle bow.png and bow_move.jpg.
+        # Bow move: use dedicated bow walk animation frames.
         self.bow_move_frames = [
-            load_first_image(["player/bow.png"], size=(self.rect.width, self.rect.height)),
-            load_first_image(["player/bow_move.jpg"], size=(self.rect.width, self.rect.height)),
+            load_first_image(
+                ["player/playerwalk_withbow_clean_1.png", "player/playerwalk_withbow (1).png"],
+                size=(self.rect.width, self.rect.height),
+            ),
+            load_first_image(
+                ["player/playerwalk_withbow_clean_2.png", "player/playerwalk_withbow (2).png"],
+                size=(self.rect.width, self.rect.height),
+            ),
+            load_first_image(
+                ["player/playerwalk_withbow_clean_3.png", "player/playerwalk_withbow (3).png"],
+                size=(self.rect.width, self.rect.height),
+            ),
         ]
         self.bow_move_frames = [frame for frame in self.bow_move_frames if frame]
-        if len(self.bow_move_frames) > 1:
-            self.bow_move_frames[1] = self._remove_near_bg(self.bow_move_frames[1], tolerance=50)
+        self.bow_move_frames = [self._remove_near_bg(frame, tolerance=35) for frame in self.bow_move_frames]
 
         self.hurt_sprite = load_first_image(["player/hurt.png", "player/hurt.jpeg"], size=(self.rect.width, self.rect.height))
         self.death_sprite = load_first_image(["player/death.png", "player/death1.png", "player/death.jpeg"], size=(self.rect.width, self.rect.height))
 
         # Bow attack uses only bow_01.jpeg and bow_02.jpeg frames.
         self.bow_attack_sprites = [
-            load_first_image(["player/bow_01.jpeg"], size=(self.rect.width, self.rect.height)),
-            load_first_image(["player/bow_02.jpeg"], size=(self.rect.width, self.rect.height)),
+            load_first_image(["player/bow_01.png", "player/bow_01.jpeg", "player/bow_01.jpg"], size=(self.rect.width, self.rect.height)),
+            load_first_image(["player/bow_02.png", "player/bow_02.jpeg", "player/bow_02.jpg"], size=(self.rect.width, self.rect.height)),
         ]
         self.bow_attack_sprites = [frame for frame in self.bow_attack_sprites if frame]
         if self.bow_attack_sprites:
@@ -137,7 +146,14 @@ class Player(BaseEntity):
         return frames
 
     def handle_event(self, event):
-        if event.type != pygame.KEYDOWN or not self.control_enabled:
+        if not self.control_enabled:
+            return
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            self.attack_requested = True
+            return
+
+        if event.type != pygame.KEYDOWN:
             return
 
         if event.key == ATTACK:
@@ -146,8 +162,9 @@ class Player(BaseEntity):
             self.interact_requested = True
         elif event.key == SWITCH_SWORD:
             self.state_manager.set("current_weapon", "sword")
-        elif event.key == SWITCH_BOW and self.state_manager.get("has_bow", False):
-            self.state_manager.set("current_weapon", "bow")
+        elif event.key == SWITCH_BOW:
+            # Bow disabled for this build.
+            return
 
     def consume_interact(self):
         if self.interact_requested:
