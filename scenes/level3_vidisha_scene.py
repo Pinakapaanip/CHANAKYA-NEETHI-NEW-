@@ -21,6 +21,12 @@ class Level3VidishaScene(BaseScene):
     LEVEL_NAME = "Vidisha"
 
     def __init__(self, game, state_manager):
+        # Level intro cutscene state
+        self.intro_cutscene_active = True
+        self.intro_cutscene_step = 0
+        self.intro_cutscene_done = False
+        self.player_portrait = load_first_image(["player/protrait.png"], size=(160, 160))
+        self.soldier_portrait = load_first_image(["enemies/soldier_idle.png", "enemies/soldier_idle.jpeg"], size=(160, 160))
         super().__init__(game)
         self.state_manager = state_manager
         self.state = state_manager.game_state
@@ -44,130 +50,268 @@ class Level3VidishaScene(BaseScene):
         # Level 3 continuity requirement.
         self.state_manager.set("has_bow", True)
         if self.state_manager.get("current_weapon") not in ("sword", "bow"):
-            self.state_manager.set("current_weapon", "sword")
+            import random
+            import pygame
 
-        self.hud = HUD(self.font, self.small_font)
-        self.coin_system = CoinSystem(self.state_manager)
-        self.combat_system = CombatSystem()
-        self.enemy_ai_system = EnemyAISystem(aggro_distance=520)
-        self.player_ranged = RangedCombatSystem(screen_width=999999)
+            from entities.archer_soldier import ArcherSoldier
+            from entities.arrow import Arrow
+            from entities.npc import NPC
+            from entities.player import Player
+            from entities.soldier import Soldier
+            from scenes.base_scene import BaseScene
+            from settings import SCREEN_HEIGHT, SCREEN_WIDTH
+            from systems.coin_system import CoinSystem
+            from systems.combat_system import CombatSystem
+            from systems.enemy_ai_system import EnemyAISystem
+            from systems.ranged_combat_system import RangedCombatSystem
+            from ui.hud import HUD
+            from utils.asset_manager import load_first_image
 
-        self.enemy_arrows = []
-        self.enemy_arrow_cooldown = 1.5
-        self.enemy_arrow_speed = 520
-        self.enemy_arrow_damage = 16
-        self._enemy_shot_timers = {}
+            class Level3VidishaScene(BaseScene):
+                LEVEL_NAME = "Vidisha"
 
-        self.world_width, self.world_height = self._compute_world_size()
-        self.world_rect = pygame.Rect(0, 0, self.world_width, self.world_height)
-        self.camera = pygame.Vector2(0, 0)
+                def __init__(self, game, state_manager):
+                    super().__init__(game)
+                    self.state_manager = state_manager
+                    self.state = state_manager.game_state
 
-        zone_w = 1050
-        self.entry_zone = pygame.Rect(0, 0, zone_w, self.world_height)
-        self.spy_zone = pygame.Rect(zone_w, 0, zone_w, self.world_height)
-        self.strategy_zone = pygame.Rect(zone_w * 2, 0, zone_w, self.world_height)
-        self.split_exit_zone = pygame.Rect(zone_w * 3, 0, zone_w, self.world_height)
+                    self.font = pygame.font.SysFont("verdana", 22)
+                    self.small_font = pygame.font.SysFont("verdana", 17)
 
-        self.exit_trigger = pygame.Rect(self.world_width - 40, 0, 40, self.world_height)
+                    self.bg_image = load_first_image([
+                        "levels/level3_bg.jpeg", "levels/level3_bg.jpg"
+                    ], size=None)
+                    self.walkmask = load_first_image(["levels/level3_walkmask.jpg"], size=None)
 
-        self.combat_started = False
-        self.spy_active = False
-        self.spy_dialogue_active = False
-        self.spy_dialogue_step = 0
-        self.spy_reward_spawned = False
+                    spawn_x, spawn_y = self.state_manager.get("spawn_point_level3", [40, 520])
+                    self.player = Player(int(spawn_x), int(spawn_y), self.state_manager)
+                    self.player.health = self.state_manager.get("player_health", 10000)
 
-        # Post-spy: small menu + army dialogue.
-        self.call_army_menu_active = False
-        self.call_army_button_rect = pygame.Rect(0, 0, 240, 54)
-        self.call_army_button_rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 40)
+                    self.state_manager.set("infinite_health", True)
+                    self.state_manager.set("has_bow", True)
+                    if self.state_manager.get("current_weapon") not in ("sword", "bow"):
+                        self.state_manager.set("current_weapon", "sword")
 
-        self.army_dialogue_active = False
-        self.army_dialogue_step = 0
-        self.strategy_cutscene_active = False
-        self.strategy_cutscene_t = 0.0
-        self.strategy_signal_timer = 0.0
-        self.allied_army = []
+                    self.hud = HUD(self.font, self.small_font)
+                    self.coin_system = CoinSystem(self.state_manager)
+                    self.combat_system = CombatSystem()
+                    self.enemy_ai_system = EnemyAISystem(aggro_distance=520)
+                    self.player_ranged = RangedCombatSystem(screen_width=999999)
 
-        self.enemy_death_registry = set()
-        self.melee_soldiers = []
-        self.archer_soldiers = []
+                    self.enemy_arrows = []
+                    self.enemy_arrow_cooldown = 1.5
+                    self.enemy_arrow_speed = 520
+                    self.enemy_arrow_damage = 16
+                    self._enemy_shot_timers = {}
 
-        # Spy pops out near the right-side house after combat.
-        self.spy = NPC(self.world_width - 240, int(self.world_height * 0.60), "Spy", width=52, height=74)
-        self.spy.revealed = True
+                    self.world_width, self.world_height = self._compute_world_size()
+                    self.world_rect = pygame.Rect(0, 0, self.world_width, self.world_height)
+                    self.camera = pygame.Vector2(0, 0)
 
-        self.block_top_path_rect = pygame.Rect(self.strategy_zone.x + 540, 0, self.strategy_zone.width - 540, int(self.world_height * 0.42))
-        self.bottom_path_only_rect = pygame.Rect(self.strategy_zone.x + 540, int(self.world_height * 0.42), self.strategy_zone.width - 540, self.world_height - int(self.world_height * 0.42))
+                    zone_w = 1050
+                    self.entry_zone = pygame.Rect(0, 0, zone_w, self.world_height)
+                    self.spy_zone = pygame.Rect(zone_w, 0, zone_w, self.world_height)
+                    self.strategy_zone = pygame.Rect(zone_w * 2, 0, zone_w, self.world_height)
+                    self.split_exit_zone = pygame.Rect(zone_w * 3, 0, zone_w, self.world_height)
 
-        self.coin_icon = load_first_image(
-            ["ui/coin_icon.jpeg", "ui/coin_icon1.jpeg"],
-            size=(24, 24),
-        )
+                    self.exit_trigger = pygame.Rect(self.world_width - 40, 0, 40, self.world_height)
+                    self.top_exit_trigger = pygame.Rect(0, 0, self.world_width, 24)
 
-        # Dialogue portraits.
-        self.player_portrait = load_first_image(["player/protrait.png"], size=(160, 160))
-        # Prefer transparent PNG if available; fall back to the existing JPEG.
-        self.army_portrait = load_first_image(
-            [
-                "npcs/player_side_soliders-removebg-preview.png",
-                "npcs/player_side_soliders.png",
-                "npcs/player_side_soliders.jpeg",
-            ],
-            size=(320, 200),
-        )
+                    self.combat_started = False
+                    self.spy_active = False
+                    self.spy_reward_spawned = False
+                    self.enemy_death_registry = set()
+                    self.melee_soldiers = []
+                    self.archer_soldiers = []
 
-        if self.state_manager.get("has_bow", False):
-            self.state_manager.set("has_bow", True)
+                    self.spy = NPC(self.world_width - 240, int(self.world_height * 0.60), "Spy", width=52, height=74)
+                    self.spy.revealed = True
 
-    def _compute_world_size(self):
-        if self.bg_image:
-            return self.bg_image.get_width(), self.bg_image.get_height()
-        return SCREEN_WIDTH * 4, SCREEN_HEIGHT
+                    self.block_top_path_rect = pygame.Rect(self.strategy_zone.x + 540, 0, self.strategy_zone.width - 540, int(self.world_height * 0.42))
+                    self.bottom_path_only_rect = pygame.Rect(self.strategy_zone.x + 540, int(self.world_height * 0.42), self.strategy_zone.width - 540, self.world_height - int(self.world_height * 0.42))
 
-    def _walkmask_is_walkable(self, x, y):
-        # Walkmask tuning is asset-dependent; to ensure movement works reliably,
-        # Level 3 currently treats the whole map as walkable.
-        if x < 0 or y < 0 or x >= self.world_width or y >= self.world_height:
-            return False
-        return True
+                    self.coin_icon = load_first_image([
+                        "ui/coin_icon.jpeg", "ui/coin_icon1.jpeg"
+                    ], size=(24, 24))
 
-    def _player_position_is_walkable(self):
-        feet_y = self.player.rect.bottom - 3
-        sample_x = (self.player.rect.left + 6, self.player.rect.centerx, self.player.rect.right - 6)
-        return all(self._walkmask_is_walkable(x, feet_y) for x in sample_x)
+                    if self.state_manager.get("has_bow", False):
+                        self.state_manager.set("has_bow", True)
 
-    def _spawn_entry_combat_enemies(self):
-        if self.combat_started:
-            return
+                def _compute_world_size(self):
+                    if self.bg_image:
+                        return self.bg_image.get_width(), self.bg_image.get_height()
+                    return SCREEN_WIDTH * 4, SCREEN_HEIGHT
 
-        base_x = self.entry_zone.x + 520
-        base_y = int(self.world_height * 0.68)
-        spread = [(-80, 0), (0, -25), (80, 20), (-140, 35), (140, -15)]
+                def _walkmask_is_walkable(self, x, y):
+                    if x < 0 or y < 0 or x >= self.world_width or y >= self.world_height:
+                        return False
+                    return True
 
-        self.melee_soldiers = [Soldier(base_x + dx, base_y + dy) for dx, dy in spread]
-        self.archer_soldiers = [ArcherSoldier(base_x + 260 + dx, base_y - 70 + dy) for dx, dy in spread]
+                def _player_position_is_walkable(self):
+                    feet_y = self.player.rect.bottom - 3
+                    sample_x = (self.player.rect.left + 6, self.player.rect.centerx, self.player.rect.right - 6)
+                    return all(self._walkmask_is_walkable(x, feet_y) for x in sample_x)
 
-        for e in self.melee_soldiers + self.archer_soldiers:
-            e.set_hostile(True)
+                def _spawn_entry_combat_enemies(self):
+                    if self.combat_started:
+                        return
+                    base_x = self.entry_zone.x + 520
+                    base_y = int(self.world_height * 0.68)
+                    spread = [(-80, 0), (0, -25), (80, 20), (-140, 35), (140, -15)]
+                    self.melee_soldiers = [Soldier(base_x + dx, base_y + dy) for dx, dy in spread]
+                    self.archer_soldiers = [ArcherSoldier(base_x + 260 + dx, base_y - 70 + dy) for dx, dy in spread]
+                    for e in self.melee_soldiers + self.archer_soldiers:
+                        e.set_hostile(True)
+                    self.state_manager.set("combat_active", True)
+                    self.state_manager.set("enemies_defeated_count", 0)
+                    self.combat_started = True
 
-        self.state_manager.set("combat_active", True)
-        self.state_manager.set("enemies_defeated_count", 0)
-        self.combat_started = True
+                def _all_enemies(self):
+                    return [e for e in (self.melee_soldiers + self.archer_soldiers) if e.alive]
 
-    def _all_enemies(self):
-        return [e for e in (self.melee_soldiers + self.archer_soldiers) if e.alive]
+                def _register_enemy_death(self, enemy):
+                    enemy_id = id(enemy)
+                    if enemy_id in self.enemy_death_registry:
+                        return
+                    self.enemy_death_registry.add(enemy_id)
+                    self.state_manager.set(
+                        "enemies_defeated_count",
+                        self.state_manager.get("enemies_defeated_count", 0) + 1,
+                    )
+                    if random.random() < 0.7:
+                        self.coin_system.spawn_coins(enemy.rect.centerx, enemy.rect.centery, 2, 5)
 
-    def _register_enemy_death(self, enemy):
-        enemy_id = id(enemy)
-        if enemy_id in self.enemy_death_registry:
-            return
+                def _handle_player_attack(self):
+                    if not self.player.consume_attack():
+                        return
+                    weapon = self.state_manager.get("current_weapon", "sword")
+                    enemies = self._all_enemies()
+                    if weapon == "sword" and self.state_manager.get("has_sword", True):
+                        defeated = self.combat_system.sword_attack(self.player, enemies)
+                        for enemy in defeated:
+                            self._register_enemy_death(enemy)
+                    elif weapon == "bow" and self.state_manager.get("has_bow", False):
+                        self.player_ranged.fire_arrow(self.player)
 
-        self.enemy_death_registry.add(enemy_id)
-        self.state_manager.set(
-            "enemies_defeated_count",
-            self.state_manager.get("enemies_defeated_count", 0) + 1,
-        )
+                def _enemy_archer_ai_and_shoot(self, dt):
+                    player_rect = self.player.rect
+                    for archer in self.archer_soldiers:
+                        if not archer.alive or not archer.hostile:
+                            continue
+                        dx = player_rect.centerx - archer.rect.centerx
+                        dy = player_rect.centery - archer.rect.centery
+                        dist = (dx * dx + dy * dy) ** 0.5
+                        archer.facing = 1 if dx >= 0 else -1
+                        desired_min = 220
+                        desired_max = 380
+                        if dist < desired_min:
+                            move = -1 if dx >= 0 else 1
+                            archer.rect.x += int(move * archer.speed * dt)
+                        elif dist > desired_max:
+                            move = 1 if dx >= 0 else -1
+                            archer.rect.x += int(move * archer.speed * dt * 0.35)
+                        timer = self._enemy_shot_timers.get(id(archer), 0.0)
+                        timer -= dt
+                        if timer <= 0 and dist <= 520:
+                            spawn_x = archer.rect.right if archer.facing > 0 else archer.rect.left - 22
+                            spawn_y = archer.rect.centery - 2
+                            enemy_arrow = Arrow(
+                                spawn_x,
+                                spawn_y,
+                                archer.facing,
+                                speed=self.enemy_arrow_speed,
+                                damage=self.enemy_arrow_damage,
+                            )
+                            self.enemy_arrows.append(enemy_arrow)
+                            archer.attack_anim_timer = 0.16
+                            if archer.attack_sprites:
+                                archer.attack_frame_index = (archer.attack_frame_index + 1) % len(archer.attack_sprites)
+                            timer = self.enemy_arrow_cooldown
+                        self._enemy_shot_timers[id(archer)] = timer
 
+                def _update_enemy_arrows(self, dt):
+                    for arrow in self.enemy_arrows[:]:
+                        arrow.update(dt)
+                        if arrow.rect.right < 0 or arrow.rect.left > self.world_width:
+                            self.enemy_arrows.remove(arrow)
+                            continue
+                        if arrow.rect.colliderect(self.player.rect):
+                            if not self.state_manager.get("infinite_health", False):
+                                self.player.take_damage(arrow.damage)
+                            if arrow in self.enemy_arrows:
+                                self.enemy_arrows.remove(arrow)
+
+                def _start_spy(self):
+                    if self.spy_active or self.state_manager.get("map_piece_3_collected", False):
+                        return
+                    self.spy_active = True
+
+                def _handle_interactions(self):
+                    if not self.player.consume_interact():
+                        return
+                    # Add original spy/strategy logic here if needed
+
+                def handle_event(self, event):
+                    self.player.handle_event(event)
+
+                def _update_camera(self, dt):
+                    look_ahead = 140 * self.player.facing
+                    target_x = self.player.rect.centerx + look_ahead - SCREEN_WIDTH / 2
+                    target_y = self.player.rect.centery - SCREEN_HEIGHT / 2
+                    target_x = max(0, min(target_x, self.world_width - SCREEN_WIDTH))
+                    target_y = max(0, min(target_y, self.world_height - SCREEN_HEIGHT))
+                    target = pygame.Vector2(target_x, target_y)
+                    lerp = 8.5
+                    self.camera += (target - self.camera) * min(1.0, lerp * dt)
+
+                def update(self, dt):
+                    self.player.control_enabled = True
+                    old_pos = self.player.rect.topleft
+                    self.player.update(dt)
+                    self.player.rect.clamp_ip(self.world_rect)
+                    if not self._player_position_is_walkable():
+                        self.player.rect.topleft = old_pos
+                    if not self.combat_started and self.player.rect.colliderect(self.entry_zone.inflate(-120, -120)):
+                        self._spawn_entry_combat_enemies()
+                    self._handle_player_attack()
+                    self._handle_interactions()
+
+                def draw(self, surface):
+                    self._draw_world(surface)
+                    cam = self.camera
+                    for enemy in self.melee_soldiers + self.archer_soldiers:
+                        if enemy.alive:
+                            enemy.rect.move_ip(-int(cam.x), -int(cam.y))
+                            enemy.draw(surface)
+                            enemy.rect.move_ip(int(cam.x), int(cam.y))
+                    if self.spy_active or self.state_manager.get("map_piece_3_collected", False):
+                        self.spy.rect.move_ip(-int(cam.x), -int(cam.y))
+                        self.spy.draw(surface)
+                        self.spy.rect.move_ip(int(cam.x), int(cam.y))
+                    for coin in self.coin_system.coins:
+                        if getattr(coin, "collected", False):
+                            continue
+                        coin.rect.move_ip(-int(cam.x), -int(cam.y))
+                        coin.draw(surface)
+                        coin.rect.move_ip(int(cam.x), int(cam.y))
+                    for arrow in self.enemy_arrows:
+                        arrow.rect.move_ip(-int(cam.x), -int(cam.y))
+                        arrow.draw(surface)
+                        arrow.rect.move_ip(int(cam.x), int(cam.y))
+                    for arrow in self.player_ranged.arrows:
+                        arrow.rect.move_ip(-int(cam.x), -int(cam.y))
+                        arrow.draw(surface)
+                        arrow.rect.move_ip(int(cam.x), int(cam.y))
+                    self.player.rect.move_ip(-int(cam.x), -int(cam.y))
+                    self.player.draw(surface)
+                    self.player.rect.move_ip(int(cam.x), int(cam.y))
+                    self.hud.draw(
+                        surface,
+                        self.state_manager.game_state,
+                        f"Level 3: {self.LEVEL_NAME} | Arrows: {len(self.player_ranged.arrows)}",
+                        "Explore forward",
+                        self.coin_icon,
+                    )
         if random.random() < 0.7:
             self.coin_system.spawn_coins(enemy.rect.centerx, enemy.rect.centery, 2, 5)
 
@@ -296,6 +440,15 @@ class Level3VidishaScene(BaseScene):
             self.player.control_enabled = True
 
     def handle_event(self, event):
+        if self.intro_cutscene_active:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                self.intro_cutscene_step += 1
+                # End cutscene after last line
+                if self.intro_cutscene_step >= 17:
+                    self.intro_cutscene_active = False
+                    self.intro_cutscene_done = True
+                    self._spawn_intro_enemies()
+            return
         if self.call_army_menu_active:
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if self.call_army_button_rect.collidepoint(event.pos):
@@ -366,7 +519,8 @@ class Level3VidishaScene(BaseScene):
 
     def update(self, dt):
         self.player.control_enabled = (
-            not self.strategy_cutscene_active
+            not self.intro_cutscene_active
+            and not self.strategy_cutscene_active
             and not self.spy_dialogue_active
             and not self.call_army_menu_active
             and not self.army_dialogue_active
@@ -384,45 +538,82 @@ class Level3VidishaScene(BaseScene):
         if not self.combat_started and self.player.rect.colliderect(self.entry_zone.inflate(-120, -120)):
             self._spawn_entry_combat_enemies()
 
+        # --- Moved from _draw_intro_cutscene: check for combat completion and start spy event ---
+        if self.combat_started and self.state_manager.get("combat_active", False):
+            if self.state_manager.get("enemies_defeated_count", 0) >= 10:
+                self.state_manager.set("combat_active", False)
+                self._start_spy()
+
+        # --- End moved logic ---
+
         if (
-            not self.strategy_cutscene_active
+            not self.intro_cutscene_active
+            and not self.strategy_cutscene_active
             and not self.spy_dialogue_active
             and not self.call_army_menu_active
             and not self.army_dialogue_active
         ):
             self._handle_player_attack()
             self._handle_interactions()
+    def _spawn_intro_enemies(self):
+        # Spawn soldiers from all directions
+        base_x, base_y = self.player.rect.centerx, self.player.rect.centery
+        offsets = [(-300, 0), (300, 0), (0, -200), (0, 200), (-220, -120), (220, 120)]
+        self.melee_soldiers = [Soldier(base_x + dx, base_y + dy) for dx, dy in offsets]
+        for e in self.melee_soldiers:
+            e.set_hostile(True)
+        # Make archers' bow attacks slower
+        for a in self.archer_soldiers:
+            a.attack_cooldown = 2.5
+        # Ensure combat flags are set so AI and combat logic run
+        self.combat_started = True
+        self.state_manager.set("combat_active", True)
+    def _draw_intro_cutscene(self, surface):
+        lines = [
+            "PLAYER: What has happened here...?",
+            "PLAYER: This place... it feels abandoned.",
+            "PLAYER: Where is the last spy?",
+            "PLAYER: He was supposed to be here.",
+            "PLAYER: Something is not right.",
+            "SOLDIER: Stop right there.",
+            "SOLDIER: I finally found you.",
+            "SOLDIER: You are searching for the secret map into the kingdom, aren’t you?",
+            "SOLDIER: Fool... you are too late.",
+            "SOLDIER: The spy you seek... is already gone.",
+            "SOLDIER: You will never reach him.",
+            "SOLDIER: And you will go no further.",
+            "PLAYER: Then I will carve my way through.",
+            "PLAYER: Move aside... or fall.",
+            "SOLDIER: Attack!",
+        ]
+        idx = max(0, min(self.intro_cutscene_step, len(lines) - 1))
+        text = lines[idx]
+        is_player = text.startswith("PLAYER:")
+        box = pygame.Rect(40, SCREEN_HEIGHT - 230, SCREEN_WIDTH - 80, 190)
+        pygame.draw.rect(surface, (18, 18, 18), box, border_radius=12)
+        pygame.draw.rect(surface, (84, 130, 175), box, 2, border_radius=12)
+        left_rect = pygame.Rect(box.x + 18, box.y + 15, 160, 160)
+        right_rect = pygame.Rect(box.right - 18 - 160, box.y + 15, 160, 160)
+        if is_player and self.player_portrait:
+            surface.blit(self.player_portrait, left_rect)
+        elif not is_player and self.soldier_portrait:
+            surface.blit(self.soldier_portrait, right_rect)
+        text_area = pygame.Rect(left_rect.right + 18, box.y + 18, right_rect.left - (left_rect.right + 36), 154)
+        pygame.draw.rect(surface, (20, 29, 44), text_area, border_radius=10)
+        pygame.draw.rect(surface, (84, 130, 175), text_area, 2, border_radius=10)
+        msg = self.small_font.render(text, True, (245, 245, 245))
+        hint = self.small_font.render("SPACE to continue", True, (235, 185, 64))
+        surface.blit(msg, (text_area.x + 14, text_area.y + 22))
+        surface.blit(hint, (text_area.x + 14, text_area.bottom - 28))
 
-        enemies = self._all_enemies()
-        if enemies:
-            self.enemy_ai_system.update(enemies, self.player, dt)
-
-        for enemy in enemies:
-            if enemy.enemy_type == "soldier":
-                if enemy.try_attack_player(self.player.rect):
-                    if not self.state_manager.get("infinite_health", False):
-                        self.player.take_damage(enemy.contact_damage)
-
-        self._enemy_archer_ai_and_shoot(dt)
-        self._update_enemy_arrows(dt)
-
-        defeated = self.player_ranged.update(dt, enemies)
-        for enemy in defeated:
-            self._register_enemy_death(enemy)
-
-        for enemy in self.melee_soldiers + self.archer_soldiers:
-            if not enemy.alive:
-                self._register_enemy_death(enemy)
-
-        self.coin_system.update(dt, self.player)
 
         if self.combat_started and self.state_manager.get("combat_active", False):
             if self.state_manager.get("enemies_defeated_count", 0) >= 10:
                 self.state_manager.set("combat_active", False)
                 self._start_spy()
 
-        self._update_strategy_cutscene(dt)
 
+        # Normal exit (right/bottom path) still works.
         if (
             self.state_manager.get("strategy_executed", False)
             and self.player.rect.colliderect(self.exit_trigger)
@@ -433,7 +624,16 @@ class Level3VidishaScene(BaseScene):
             self.game.load_scene("level_complete")
             return
 
-        self._update_camera(dt)
+        # New: top exit after army dialogue
+        if (
+            not self.army_dialogue_active
+            and not self.call_army_menu_active
+            and self.player.rect.colliderect(self.top_exit_trigger)
+        ):
+            self.state_manager.set("level_complete", True)
+            self.game.load_scene("level_complete")
+            return
+
         # Keep health from going negative and allow INF mode.
         if self.state_manager.get("infinite_health", False):
             self.player.health = max(self.player.health, self.player.max_health)
@@ -661,4 +861,8 @@ class Level3VidishaScene(BaseScene):
             self.interaction_hint(),
             self.coin_icon,
         )
+
+        # Always draw intro cutscene UI last so it's on top
+        if self.intro_cutscene_active:
+            self._draw_intro_cutscene(surface)
 
