@@ -1,0 +1,9 @@
+{
+  "player_speed": 240,
+  "sword_damage": 35,
+  "arrow_damage": 20,
+  "enemy_coin_min": 2,
+  "enemy_coin_max": 5,
+  "spy_reward_coin_min": 5,
+  "spy_reward_coin_max": 8
+}
