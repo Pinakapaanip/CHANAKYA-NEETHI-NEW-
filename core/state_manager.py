@@ -4,7 +4,7 @@ from utils.json_loader import load_json, save_json
 
 
 BASE_GAME_STATE = {
-    "player_health": 100,
+    "player_health": 10,
     "coins_collected": 0,
     "has_sword": True,
     "has_bow": False,

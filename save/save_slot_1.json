@@ -1,11 +1,11 @@
 {
-  "player_health": 8352,
-  "coins_collected": 41,
+  "player_health": 7328,
+  "coins_collected": 178,
   "has_sword": true,
   "has_bow": true,
   "current_weapon": "sword",
   "combat_active": false,
-  "enemies_defeated_count": 4,
+  "enemies_defeated_count": 2,
   "map_piece_collected": true,
   "intro_cutscene_done": true,
   "bow_training_cutscene_done": true,
@@ -14,8 +14,8 @@
   "spy_met_in_minimap": true,
   "minimap_pass_unlocked": true,
   "spawn_point_level2": [
-    1160,
-    360
+    500,
+    350
   ],
   "spawn_point_level2_minimap": [
     640,

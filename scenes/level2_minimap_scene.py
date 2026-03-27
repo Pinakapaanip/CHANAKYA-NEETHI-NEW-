@@ -19,11 +19,25 @@ class Level2MinimapScene(BaseScene):
         super().__init__(game)
         self.state_manager = state_manager
 
-        self.font = pygame.font.SysFont("verdana", 22)
-        self.small_font = pygame.font.SysFont("verdana", 17)
+        # Prefer an old-English style font family with safe fallbacks.
+        self.font = pygame.font.SysFont("old english text mt", 24)
+        if not self.font:
+            self.font = pygame.font.SysFont("uncial antiqua", 24)
+        if not self.font:
+            self.font = pygame.font.SysFont("cinzel", 24)
+        if not self.font:
+            self.font = pygame.font.SysFont("times new roman", 24)
+
+        self.small_font = pygame.font.SysFont("old english text mt", 18)
+        if not self.small_font:
+            self.small_font = pygame.font.SysFont("uncial antiqua", 18)
+        if not self.small_font:
+            self.small_font = pygame.font.SysFont("cinzel", 18)
+        if not self.small_font:
+            self.small_font = pygame.font.SysFont("times new roman", 18)
 
         self.background_image = load_first_image(
-            ["levels/level_minimap.jpeg", "level_minimap.jpeg"],
+            ["levels/level2_path.jpeg", "levels/level2_path.png", "level2_path.jpeg", "level2_path.png"],
             size=(SCREEN_WIDTH, SCREEN_HEIGHT),
         )
 
@@ -31,7 +45,7 @@ class Level2MinimapScene(BaseScene):
         self.player = Player(int(spawn_x), int(spawn_y), self.state_manager)
         self.player.health = self.state_manager.get("player_health", 10000)
 
-        self.spy = Spy(980, 300)
+        self.spy = Spy(SCREEN_WIDTH - 70, 12)
         self.spy.revealed = True
         self.minimap_soldier = Soldier(620, 300)
         self.minimap_soldier.set_hostile(True)
@@ -76,6 +90,25 @@ class Level2MinimapScene(BaseScene):
         self.player.control_enabled = not self.cutscene_manager.is_active()
         self.player.update(dt)
         self.player.rect.clamp_ip(pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
+
+        # Allow a little overlap so contact combat feels less rigid.
+        if self.minimap_soldier.alive and self.player.rect.colliderect(self.minimap_soldier.rect):
+            overlap = self.player.rect.clip(self.minimap_soldier.rect)
+            if overlap.width > 0 and overlap.height > 0:
+                overlap_allowance = 10
+                if overlap.width < overlap.height:
+                    push = max(0, overlap.width - overlap_allowance)
+                    if self.player.rect.centerx < self.minimap_soldier.rect.centerx:
+                        self.player.rect.x -= push
+                    else:
+                        self.player.rect.x += push
+                else:
+                    push = max(0, overlap.height - overlap_allowance)
+                    if self.player.rect.centery < self.minimap_soldier.rect.centery:
+                        self.player.rect.y -= push
+                    else:
+                        self.player.rect.y += push
+                self.player.rect.clamp_ip(pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
 
         if self.minimap_soldier.alive:
             self.enemy_ai_system.update([self.minimap_soldier], self.player, dt)

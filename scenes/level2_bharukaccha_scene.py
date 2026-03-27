@@ -5,7 +5,6 @@ from core.objective_manager import ObjectiveManager
 from data.dialogues import LEVEL2_DIALOGUES
 from data.objectives import OBJECTIVES_LEVEL2
 from entities.guard import Guard
-from entities.npc import NPC
 from entities.player import Player
 from entities.soldier import Soldier
 from scenes.base_scene import BaseScene
@@ -24,8 +23,22 @@ class Level2BharukacchaScene(BaseScene):
         self.state_manager = state_manager
         self.state = state_manager.game_state
 
-        self.font = pygame.font.SysFont("verdana", 22)
-        self.small_font = pygame.font.SysFont("verdana", 17)
+        # Prefer an old-English style font family with safe fallbacks.
+        self.font = pygame.font.SysFont("old english text mt", 24)
+        if not self.font:
+            self.font = pygame.font.SysFont("uncial antiqua", 24)
+        if not self.font:
+            self.font = pygame.font.SysFont("cinzel", 24)
+        if not self.font:
+            self.font = pygame.font.SysFont("times new roman", 24)
+
+        self.small_font = pygame.font.SysFont("old english text mt", 18)
+        if not self.small_font:
+            self.small_font = pygame.font.SysFont("uncial antiqua", 18)
+        if not self.small_font:
+            self.small_font = pygame.font.SysFont("cinzel", 18)
+        if not self.small_font:
+            self.small_font = pygame.font.SysFont("times new roman", 18)
         self.background_image = load_first_image(
             ["levels/level2_bg.jpeg", "levels/level2_bg.jpg"],
             size=(SCREEN_WIDTH, SCREEN_HEIGHT),
@@ -39,7 +52,6 @@ class Level2BharukacchaScene(BaseScene):
         self.player = Player(int(spawn_x), int(spawn_y), self.state_manager)
         self.player.health = self.state.get("player_health", 10000)
 
-        self.chanakya = NPC(700, 360, "Chanakya", width=52, height=74)
         # Bow pickup in top-right corner
         self.bow_pickup_rect = pygame.Rect(1100, 50, 38, 38)
         # Transition to level2_minimap from top-center road
@@ -151,9 +163,9 @@ class Level2BharukacchaScene(BaseScene):
     def start_cutscene(self, cutscene_key):
         cutscene = self.cutscenes[cutscene_key]
 
-        # Make Chandragupta face Chanakya when their dialogue begins.
+        # Keep player facing right for dialogue-box-only scenes.
         if cutscene.portrait_name == "Chanakya":
-            self.player.facing = 1 if self.chanakya.rect.centerx > self.player.rect.centerx else -1
+            self.player.facing = 1
 
         if self.cutscene_manager.start(cutscene):
             self.player.control_enabled = False
@@ -260,13 +272,12 @@ class Level2BharukacchaScene(BaseScene):
             self.objective_manager.set_objective(OBJECTIVES_LEVEL2["return_to_chanakya"])
             return
 
-        # Bow training cutscene when returning to Chanakya.
+        # Bow training cutscene via dialogue boxes (no on-map Chanakya entity).
         if self.state_manager.get("has_bow", False) and not self.state_manager.get(
             "bow_training_cutscene_done", False
         ):
-            if self.player.rect.colliderect(self.chanakya.rect.inflate(60, 40)):
-                self.start_cutscene("bow_training")
-                return
+            self.start_cutscene("bow_training")
+            return
 
         # No spy interaction in this scene. Spy is met in minimap scene.
 
@@ -323,6 +334,25 @@ class Level2BharukacchaScene(BaseScene):
 
         self.enemy_ai_system.update(self.living_enemies(), self.player, dt)
 
+        # Keep player from visually overlapping living enemies.
+        for enemy in self.living_enemies():
+            if self.player.rect.colliderect(enemy.rect):
+                overlap = self.player.rect.clip(enemy.rect)
+                if overlap.width > 0 and overlap.height > 0:
+                    if overlap.width < overlap.height:
+                        push = overlap.width
+                        if self.player.rect.centerx < enemy.rect.centerx:
+                            self.player.rect.x -= push
+                        else:
+                            self.player.rect.x += push
+                    else:
+                        push = overlap.height
+                        if self.player.rect.centery < enemy.rect.centery:
+                            self.player.rect.y -= push
+                        else:
+                            self.player.rect.y += push
+                    self.player.rect.clamp_ip(pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
+
         for enemy in self.living_enemies():
             if enemy.try_attack_player(self.player.rect):
                 self.player.take_damage(enemy.contact_damage)
@@ -369,8 +399,8 @@ class Level2BharukacchaScene(BaseScene):
 
         if self.state_manager.get("has_bow", False) and not self.state_manager.get(
             "bow_training_cutscene_done", False
-        ) and self.player.rect.colliderect(self.chanakya.rect.inflate(60, 40)):
-            return "Press E to speak to Chanakya"
+        ):
+            return "Press E to continue dialogue"
 
         if (
             self.state_manager.get("has_bow", False)
@@ -385,7 +415,7 @@ class Level2BharukacchaScene(BaseScene):
         if self.state_manager.get("has_bow", False) and not self.state_manager.get(
             "minimap_pass_unlocked", False
         ):
-            return "Go to Chanakya for cutscene to unlock minimap pass"
+            return "Press E to continue dialogue and unlock minimap pass"
 
         return "Press 1 for Sword | 2 for Bow | J to Attack"
 
@@ -432,8 +462,6 @@ class Level2BharukacchaScene(BaseScene):
             return
             
         self.draw_map_layout(surface)
-
-        self.chanakya.draw(surface)
 
         for enemy in self.soldiers + self.guards:
             if enemy.alive:
